@@ -68,18 +68,28 @@ else
     EXTRAS=
 fi
 
-if [ -z "$RSYNC_RSH" ]; then
-    if [ -r "$KNOCKOUT_DIR"/rsh ]; then
-        export RSYNC_RSH=$(cat "$KNOCKOUT_DIR"/rsh)
-    else
-        export RSYNC_RSH=ssh
-    fi
-fi
-
 if [ -t 1 -a "$#" -le 0 ]; then
     PROGRESS_OPTIONS="--human-readable --progress --stats"
 else
     PROGRESS_OPTIONS=""
+fi
+
+HOST=$(cat "$KNOCKOUT_DIR"/host)
+DIR=$(cat "$KNOCKOUT_DIR"/dir)
+TARGET=
+if [ "$HOST" = localhost ]; then
+    TARGET="$DIR"/current
+    RUN_COMMAND_ON_HOST=
+else
+    TARGET="$HOST":"$DIR"/current
+    if [ -z "$RSYNC_RSH" ]; then
+        if [ -r "$KNOCKOUT_DIR"/rsh ]; then
+            export RSYNC_RSH=$(cat "$KNOCKOUT_DIR"/rsh)
+        else
+            export RSYNC_RSH=ssh
+        fi
+    fi
+    RUN_COMMAND_ON_HOST="$RSYNC_RSH $HOST"
 fi
 
 rsync \
@@ -104,9 +114,8 @@ rsync \
     $EXTRAS \
     "$@" \
     / \
-    $(cat "$KNOCKOUT_DIR"/host):$(cat "$KNOCKOUT_DIR"/dir)/current \
+    "$TARGET" \
     || exit 2
 
-# $RSYNC_RSH should not be quoted, as it may contain arguments as in `ssh -p
-# 8192`
-$RSYNC_RSH $(cat "$KNOCKOUT_DIR"/host) knockout-snap $(cat "$KNOCKOUT_DIR"/dir) || exit 5
+# $RUN_COMMAND_ON_HOST should not be quoted, as it may contain arguments
+$RUN_COMMAND_ON_HOST knockout-snap "$DIR" || exit 5
