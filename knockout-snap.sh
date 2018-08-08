@@ -38,4 +38,4 @@ while true; do
     fi
 done
 
-btrfs subvolume snapshot -r "$1/current" "$1/$NOW"
+btrfs subvolume snapshot -r "$1/current" "$1/$NOW" > /dev/null
