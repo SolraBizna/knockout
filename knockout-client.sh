@@ -110,7 +110,6 @@ rsync \
     --recursive \
     --sparse \
     --timeout=60 \
-    --xattrs \
     -M--fake-super \
     $EXTRAS \
     "$@" \
