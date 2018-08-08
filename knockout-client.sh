@@ -81,6 +81,9 @@ TARGET=
 if [ "$HOST" = localhost ]; then
     TARGET="$DIR"/current
     RUN_COMMAND_ON_HOST=
+    if [ $(whoami) = "root" ]; then
+        NO_FAKE_SUPER=y
+    fi
 else
     TARGET="$HOST":"$DIR"/current
     if [ -z "$RSYNC_RSH" ]; then
@@ -91,6 +94,10 @@ else
         fi
     fi
     RUN_COMMAND_ON_HOST="$RSYNC_RSH $HOST"
+fi
+
+if [ -z "$NO_FAKE_SUPER" ]; then
+    EXTRAS="-M--fake-super $EXTRAS"
 fi
 
 rsync \
@@ -110,7 +117,6 @@ rsync \
     --recursive \
     --sparse \
     --timeout=60 \
-    -M--fake-super \
     $EXTRAS \
     "$@" \
     / \
