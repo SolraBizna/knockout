@@ -97,7 +97,7 @@ else
 fi
 
 if [ -z "$NO_FAKE_SUPER" ]; then
-    EXTRAS="-M--fake-super $EXTRAS"
+    EXTRAS="-M--fake-super --numeric-ids $EXTRAS"
 fi
 
 rsync \
