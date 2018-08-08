@@ -1,0 +1,10 @@
+# Rust build files
+/knockout-exclude-check/target/
+# ???
+*.rs.bk
+# Emacs backup
+*~
+# Emacs lock file
+.#*
+# Emacs autosave
+\#*#
