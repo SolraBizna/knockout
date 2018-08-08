@@ -36,12 +36,14 @@ if [ -z "$__KNOCKOUT_IS_LOCKED" ]; then
     exit $WAT
 fi
 
-KILL_AGENT=
-if [ -z "$SSH_AGENT_PID" -a -z "$SSH_AUTH_SOCK" ]; then
-    exec env __KNOCKOUT_CALL_SSH_ADD=1 ssh-agent "$0" "$@"
-fi
-if [ ! -z "$__KNOCKOUT_CALL_SSH_ADD" ]; then
-    ssh-add
+if which ssh-agent >/dev/null; then
+    KILL_AGENT=
+    if [ -z "$SSH_AGENT_PID" -a -z "$SSH_AUTH_SOCK" ]; then
+        exec env __KNOCKOUT_CALL_SSH_ADD=1 ssh-agent "$0" "$@"
+    fi
+    if [ ! -z "$__KNOCKOUT_CALL_SSH_ADD" ]; then
+        ssh-add || true
+    fi
 fi
 
 if [ -z "$KNOCKOUT_DIR" ]; then
@@ -51,8 +53,6 @@ if [ -z "$KNOCKOUT_DIR" ]; then
         KNOCKOUT_DIR="/etc/knockout"
     fi
 fi
-
-set -e
 
 if [ \! \( -r "$KNOCKOUT_DIR"/host -a -r "$KNOCKOUT_DIR"/dir -a -r "$KNOCKOUT_DIR"/sources -a -r "$KNOCKOUT_DIR"/excludes \) ]; then
     echo "Knockout client not fully configured. The following files need to be created:"
