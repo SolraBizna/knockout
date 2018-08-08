@@ -109,4 +109,4 @@ rsync \
 
 # $RSYNC_RSH should not be quoted, as it may contain arguments as in `ssh -p
 # 8192`
-$RSYNC_RSH "$(cat $KNOCKOUT_DIR/host)" knockout-snap "$(cat $KNOCKOUT_DIR/dir)" || exit 5
+$RSYNC_RSH $(cat "$KNOCKOUT_DIR"/host) knockout-snap $(cat "$KNOCKOUT_DIR"/dir) || exit 5
