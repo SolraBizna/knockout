@@ -24,6 +24,7 @@ if [ -z "$__KNOCKOUT_IS_LOCKED" ]; then
            exit 1
        fi
     fi
+    set +e
     flock -E42 -xn "$KNOCKOUT_LOCK_PATH" "$ME" "$@"
     WAT=$?
     if [ $WAT = 0 ]; then
