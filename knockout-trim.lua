@@ -44,8 +44,7 @@ Options:
 -l DEPTH: (default is whatever -d is set to) How many levels deep the lockfiles
   are. You only need this if you have a lot of machines. See the README.
 -g GRACE: The grace period in which backups will never be trimmed. The default
-  for "oldest" is "day", and the default for other resolutions is one time unit
-  up from "resolution" (e.g. "week" for "day", "quarter" for "month").
+  for "oldest" is "day", otherwise the default is the resolution in use.
 -p PERIODS: (default 0) The number of grace periods into the past to preserve.
   The default of 0 means only backups in the current grace period (e.g. today)
   will be preserved. 1 also preserves the previous grace period, 2 preserves
@@ -71,7 +70,6 @@ time_periods.millenium = {
 }
 time_periods.millenia = time_periods.millenium
 time_periods.milleniums = time_periods.millenium -- ick
-time_periods.millenium.default_grace = time_periods.millenium
 time_periods.century = {
    to_bucket=function(datetime) return datetime // YEAR_MUL // 100 end,
    from_bucket=function(datetime) return datetime * YEAR_MUL * 100 end,
@@ -79,7 +77,6 @@ time_periods.century = {
    format="%i",
 }
 time_periods.century = time_periods.century
-time_periods.century.default_grace = time_periods.millenium
 time_periods.decade = {
    to_bucket=function(datetime) return datetime // YEAR_MUL // 10 end,
    from_bucket=function(datetime) return datetime * YEAR_MUL * 10 end,
@@ -87,7 +84,6 @@ time_periods.decade = {
    format="%i",
 }
 time_periods.decades = time_periods.decade
-time_periods.decade.default_grace = time_periods.century
 time_periods.year = {
    to_bucket=function(datetime) return datetime // YEAR_MUL end,
    from_bucket=function(datetime) return datetime * YEAR_MUL end,
@@ -95,7 +91,6 @@ time_periods.year = {
    format="%i",
 }
 time_periods.years = time_periods.year
-time_periods.year.default_grace = time_periods.century
 time_periods.quarter = {
    to_bucket=function(datetime)
       local month = datetime // MONTH_MUL
@@ -108,7 +103,6 @@ time_periods.quarter = {
    format="%i.%02i",
 }
 time_periods.quarters = time_periods.quarter
-time_periods.quarter.default_grace = time_periods.year
 time_periods.month = {
    to_bucket=function(datetime) return datetime // MONTH_MUL end,
    from_bucket=function(datetime) return datetime * MONTH_MUL end,
@@ -116,7 +110,6 @@ time_periods.month = {
    format="%i.%02i",
 }
 time_periods.months = time_periods.month
-time_periods.month.default_grace = time_periods.quarter
 time_periods.week = {
    to_bucket=function(datetime)
       local day = datetime // DAY_MUL
@@ -136,7 +129,6 @@ time_periods.week = {
    format="%i.%02i.%02i",
 }
 time_periods.weeks = time_periods.week
-time_periods.week.default_grace = time_periods.month
 time_periods.day = {
    to_bucket=function(datetime) return datetime // DAY_MUL end,
    from_bucket=function(datetime) return datetime * DAY_MUL end,
@@ -144,7 +136,6 @@ time_periods.day = {
    format="%i.%02i.%02i",
 }
 time_periods.days = time_periods.day
-time_periods.day.default_grace = time_periods.week
 time_periods.hour = {
    to_bucket=function(datetime) return datetime // HOUR_MUL end,
    from_bucket=function(datetime) return datetime * HOUR_MUL end,
@@ -152,7 +143,6 @@ time_periods.hour = {
    format="%i.%02i.%02i-%02i",
 }
 time_periods.hours = time_periods.hours
-time_periods.hour.default_grace = time_periods.day
 time_periods.minute = {
    to_bucket=function(datetime) return datetime // MINUTE_MUL end,
    from_bucket=function(datetime) return datetime * MINUTE_MUL end,
@@ -160,7 +150,6 @@ time_periods.minute = {
    format="%i.%02i.%02i-%02i%02i",
 }
 time_periods.minutes = time_periods.minute
-time_periods.minute.default_grace = time_periods.hour
 time_periods.second = {
    to_bucket=function(datetime) return datetime end,
    from_bucket=function(datetime) return datetime end,
@@ -168,7 +157,6 @@ time_periods.second = {
    format="%i.%02i.%02i-%02i%02i.%02i",
 }
 time_periods.seconds = time_periods.second
-time_periods.second.default_grace = time_periods.minute
 
 local DEFAULT_GRACE_FOR_OLDEST = time_periods.day
 
@@ -259,7 +247,7 @@ if commandline_valid then
          if not grace then grace = DEFAULT_GRACE_FOR_OLDEST end
       elseif time_periods[nonopt_arg[2]] then
          resolution = time_periods[nonopt_arg[2]]
-         if not grace then grace = resolution.default_grace end
+         if not grace then grace = resolution end
       else
          print("Resolution must be \"oldest\" or a time period such as \"minute\"")
          commandline_valid = false
