@@ -106,6 +106,7 @@ fn pattern_matches(mut rem: &[u8], mut pattern: &[Match], dir: bool) -> bool {
 
 impl RsyncPattern {
     pub fn new(mut src: &[u8]) -> Result<RsyncPattern, &str> {
+        let original = src.to_vec();
         let full_path = src.contains(&b'/');
         let anchor_start = if src.starts_with(b"/") {
             src = &src[1..];
@@ -229,8 +230,7 @@ impl RsyncPattern {
             pattern = vec![Match::Literal(src.to_vec())];
         }
         Ok(RsyncPattern {
-            anchor_start, req_dir, full_path, pattern,
-            original: src.to_vec()
+            anchor_start, req_dir, full_path, pattern, original
         })
     }
     pub fn matches(&self, mut src: &[u8]) -> bool {
