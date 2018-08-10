@@ -12,6 +12,7 @@ use std::io::{BufWriter,Write};
 use std::borrow::{Borrow,BorrowMut,Cow};
 use std::ffi::{OsStr,OsString};
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::MetadataExt;
 
 fn non_panicky_unwrap<T, E: Display + Debug>(x: Result<T,E>) -> T {
     if cfg!(debug_assertions) {
@@ -58,13 +59,16 @@ enum TestResult {
     /// unexcluded children.
     FullyVetted,
     /// A file that was not covered by `excludes` or `vetted`
-    UnvettedFile,
+    UnvettedFile(u64),
     /// A directory that was not covered by `excludes`, and either was not
     /// covered by `vetted` or had children that were not excluded or vetted.
     UnvettedDirectory(Vec<(Vec<u8>, TestResult)>),
     /// A directory that was not covered by `excludes`, and where an IO error
     /// occurred
     ErrorDirectory,
+    /// A file or directory that is acting as a mount point. (The Knockout
+    /// client will not traverse these by default.)
+    Mount,
 }
 
 impl TestResult {
@@ -81,13 +85,20 @@ impl TestResult {
                 out_escaped_string(out.borrow_mut(), name.to_vec())?;
                 out.write_all(b"\",")?;
             },
-            &TestResult::UnvettedFile => {
+            &TestResult::UnvettedFile(size) => {
                 out.write_all(b"\"f")?;
                 out_escaped_string(out.borrow_mut(), name.to_vec())?;
+                out.write_all(b":")?;
+                out.write_all(format!("{}", size).as_bytes())?;
                 out.write_all(b"\",")?;
             },
             &TestResult::ErrorDirectory => {
                 out.write_all(b"\"e")?;
+                out_escaped_string(out.borrow_mut(), name.to_vec())?;
+                out.write_all(b"\",")?;
+            },
+            &TestResult::Mount => {
+                out.write_all(b"\"m")?;
                 out_escaped_string(out.borrow_mut(), name.to_vec())?;
                 out.write_all(b"\",")?;
             },
@@ -105,13 +116,18 @@ impl TestResult {
     }
 }
 
-fn recursively_test(mut path: Cow<[u8]>,
+fn recursively_test(mut path: Cow<[u8]>, dev: u64,
                     excludes: &mut [SeenRsyncPattern],
                     vetted: &mut [SeenRsyncPattern],
                     errors: &mut Vec<u8>) -> TestResult {
     debug_assert!(!path.ends_with(b"/"));
-    let is_dir = fs::symlink_metadata(OsStr::from_bytes(path.borrow()))
-        .map(|x| x.is_dir()).unwrap_or(false);
+    let metadata = fs::symlink_metadata(OsStr::from_bytes(path.borrow()));
+    if let Ok(metadata) = metadata.as_ref() {
+        // TODO: check for --no-one-file-system in `extras`, and disable this
+        // check if it's found
+        if metadata.dev() != dev { return TestResult::Mount }
+    }
+    let is_dir = metadata.as_ref().map(|x| x.is_dir()).unwrap_or(false);
     if is_dir { path.to_mut().push(b'/') }
     for exclude in excludes.iter_mut() {
         if exclude.matches(path.borrow()) {
@@ -119,7 +135,9 @@ fn recursively_test(mut path: Cow<[u8]>,
             return TestResult::Excluded
         }
     }
-    let mut vet_would_be_problematic = false;
+    // all the reasons a vet would previously be marked as problematic were
+    // removed
+    let vet_would_be_problematic = false;
     let mut dir_results = Vec::new();
     if is_dir {
         let buf = path.to_mut();
@@ -143,11 +161,7 @@ fn recursively_test(mut path: Cow<[u8]>,
                                     OsStr::from_bytes(&buf));
                         errors.extend_from_slice(warning.as_bytes());
                     }
-                    let result = recursively_test(Cow::Borrowed(&buf), excludes, vetted, errors);
-                    match result {
-                        TestResult::Excluded | TestResult::FullyVetted => (),
-                        _ => vet_would_be_problematic = true,
-                    }
+                    let result = recursively_test(Cow::Borrowed(&buf), dev, excludes, vetted, errors);
                     dir_results.push((ent.file_name().as_bytes().to_vec(),
                                       result));
                 },
@@ -182,7 +196,8 @@ fn recursively_test(mut path: Cow<[u8]>,
     }
     else {
         if is_vetted { return TestResult::FullyVetted }
-        else { return TestResult::UnvettedFile }
+        else { return TestResult::UnvettedFile(metadata.map(|x| x.len())
+                                               .unwrap_or(0)) }
     }
 }
 
@@ -251,15 +266,32 @@ fn main() {
         .filter(|x| x[0] != b'#')
         .map(|x| non_panicky_unwrap(SeenRsyncPattern::new(x)))
         .collect();
+    // we have to open the file now because we're about to chdir
     let mut output_file = BufWriter::new(non_panicky_unwrap(fs::File::create(&args[1])));
-    output_file.write_all(embedded_code::HEADER).unwrap();
+    embedded_code::write_header(&mut output_file).unwrap();
     std::env::set_current_dir("/").unwrap();
     let mut errors: Vec<u8> = Vec::new();
     output_file.write_all(b"\"use strict\";\nlet raw_tree = [").unwrap();
     for source in sources {
-        let result = recursively_test(Cow::Borrowed(&source),
+        let dev = fs::metadata(OsStr::from_bytes(&source))
+            .map(|x| x.dev()).unwrap_or(0);
+        let result = recursively_test(Cow::Borrowed(&source), dev,
                                       &mut excludes, &mut vetted, &mut errors);
         result.output(&mut output_file, &source).unwrap();
+    }
+    for exclude in &excludes {
+        if !exclude.seen {
+            errors.extend_from_slice(b"WARNING: unused `excludes` pattern:");
+            errors.extend_from_slice(exclude.get_original_form());
+            errors.push(b'\n');
+        }
+    }
+    for vet in &vetted {
+        if !vet.seen {
+            errors.extend_from_slice(b"WARNING: unused `vetted` pattern:");
+            errors.extend_from_slice(vet.get_original_form());
+            errors.push(b'\n');
+        }
     }
     {
         let stderr = std::io::stderr();
@@ -268,5 +300,5 @@ fn main() {
     output_file.write_all(b"];\nlet errors = \"").unwrap();
     out_escaped_string(&mut output_file, errors).unwrap();
     output_file.write_all(b"\";\n").unwrap();
-    output_file.write_all(embedded_code::FOOTER).unwrap();
+    embedded_code::write_footer(&mut output_file).unwrap();
 }
