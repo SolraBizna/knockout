@@ -88,10 +88,11 @@ else
     TARGET="$HOST":"$DIR"/current
     if [ -z "$RSYNC_RSH" ]; then
         if [ -r "$KNOCKOUT_DIR"/rsh ]; then
-            export RSYNC_RSH=$(cat "$KNOCKOUT_DIR"/rsh)
+            RSYNC_RSH=$(cat "$KNOCKOUT_DIR"/rsh)
         else
-            export RSYNC_RSH=ssh
+            RSYNC_RSH=ssh
         fi
+        export RSYNC_RSH
     fi
     RUN_COMMAND_ON_HOST="$RSYNC_RSH $HOST"
 fi
