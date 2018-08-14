@@ -411,6 +411,7 @@ else
    -- For each bucket, delete all snaps in the bucket except the newest one,
    -- then possibly rename the newest.
    for _, machine in pairs(machines) do
+      if not machine.buckets then machine.buckets = {} end
       for _, bucket in pairs(machine.buckets) do
          table.sort(bucket, compare_snap)
          for n=1, #bucket - 1 do
