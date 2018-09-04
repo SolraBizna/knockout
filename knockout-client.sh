@@ -42,7 +42,7 @@ if which ssh-agent >/dev/null; then
         exec env __KNOCKOUT_CALL_SSH_ADD=1 ssh-agent "$0" "$@"
     fi
     if [ ! -z "$__KNOCKOUT_CALL_SSH_ADD" ]; then
-        ssh-add || true
+        ssh-add -q || true
     fi
 fi
 
