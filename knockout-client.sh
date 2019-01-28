@@ -102,6 +102,7 @@ if [ -z "$NO_FAKE_SUPER" ]; then
 fi
 
 rsync \
+    --rsync-path "nice -n 20 rsync" \
     $PROGRESS_OPTIONS \
     --acls \
     --archive \
