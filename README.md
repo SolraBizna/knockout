@@ -30,7 +30,15 @@ Install rsync and git. On Debian or Ubuntu, you can do this with:
 apt install rsync git
 ```
 
-Clone this repository:
+On macOS, you will likely already have git, but your rsync will be too old, and you'll be missing the flock utility. Both can be fixed with homebrew:
+
+```sh
+brew install util-linux rsync
+```
+
+You'll have to make sure that the `flock` utility from `util-linux` ends up in your `PATH`. That's outside the scope of this README.
+
+With the requirements installed, clone this repository:
 
 ```sh
 git clone https://github.com/SolraBizna/knockout
