@@ -117,8 +117,8 @@ When you've finished, scroll to the bottom of the page to see the entries you sh
 On Debian (and maybe Ubuntu), do:
 
 ```sh
-apt install lua5.3 liblua5.3-dev luarocks lua-filesystem rsync openssh-server
-luarocks install luaflock git
+apt install lua5.3 liblua5.3-dev luarocks lua-filesystem rsync openssh-server git
+luarocks install luaflock
 ```
 
 (If you already had `luarocks` installed, make sure it is configured for Lua version 5.3.)
