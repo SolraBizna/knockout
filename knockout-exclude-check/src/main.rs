@@ -238,8 +238,14 @@ fn main() {
         exit(1);
     }
     let koconf = non_panicky_unwrap(koconf::init());
-    let sources: Vec<Vec<u8>> = non_panicky_unwrap(koconf.get("sources"))
-        .split(|x| *x == b'\n')
+    let sources: Vec<Vec<u8>> = match koconf.get("sources") {
+        Err(_) => {
+            eprintln!("The Knockout 'sources' configuration file doesn't exist \
+                       or is inaccessible.\nCreate it before continuing.");
+            exit(1);
+        },
+        Ok(x) => x,
+    }.split(|x| *x == b'\n')
         .filter(|x| x.len() > 0)
         .filter(|x| x[0] != b'#')
         .map(|mut x| { while x.len() > 0 && x[0] == b'/' { x = &x[1..] } x })
