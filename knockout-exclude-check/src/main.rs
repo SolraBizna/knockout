@@ -145,7 +145,7 @@ fn recursively_test(mut path: Cow<[u8]>, dev: u64,
         let iterator = match fs::read_dir(OsStr::from_bytes(buf)) {
             Ok(iterator) => iterator,
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{}: {}", String::from_utf8_lossy(buf), e);
                 return TestResult::ErrorDirectory
             }
         };
