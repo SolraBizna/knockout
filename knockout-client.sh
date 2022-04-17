@@ -2,8 +2,8 @@
 
 set -e
 
-ME_DIR=$(dirname "$0")
-ME="$ME_DIR"/$(basename "$0")
+ME_DIR="$(dirname "$0")"
+ME="$ME_DIR/$(basename "$0")"
 
 if [ -z "$__KNOCKOUT_IS_LOCKED" ]; then
     export __KNOCKOUT_IS_LOCKED=1
@@ -36,16 +36,6 @@ if [ -z "$__KNOCKOUT_IS_LOCKED" ]; then
     exit $WAT
 fi
 
-if which ssh-agent >/dev/null; then
-    KILL_AGENT=
-    if [ -z "$SSH_AGENT_PID" -a -z "$SSH_AUTH_SOCK" ]; then
-        exec env __KNOCKOUT_CALL_SSH_ADD=1 ssh-agent "$0" "$@"
-    fi
-    if [ ! -z "$__KNOCKOUT_CALL_SSH_ADD" ]; then
-        ssh-add -q || true
-    fi
-fi
-
 if [ -z "$KNOCKOUT_DIR" ]; then
     if [ -d "$HOME/.knockout" ]; then
         KNOCKOUT_DIR="$HOME/.knockout"
@@ -63,8 +53,58 @@ if [ \! \( -r "$KNOCKOUT_DIR"/host -a -r "$KNOCKOUT_DIR"/dir -a -r "$KNOCKOUT_DI
     exit 3
 fi
 
+HOST="$(cat "$KNOCKOUT_DIR"/host)"
+
+if [ "$HOST" != localhost -a ! -f "$KNOCKOUT_DIR/no-ssh-agent" ] && \
+       which ssh-agent >/dev/null; then
+    KILL_AGENT=
+    if [ -z "$SSH_AGENT_PID" -a -z "$SSH_AUTH_SOCK" ]; then
+        exec ssh-agent "$0" "$@"
+    fi
+    try_ssh_add () {
+        KEY="$1"
+        FINGERPRINT="$(ssh-keygen -l -f "$KEY" | awk '{print $2}')"
+        if ! ssh-add -l | grep -qFe "$FINGERPRINT"; then
+            ssh-add "$KEY"
+        fi
+    }
+    if [ -f "$KNOCKOUT_DIR/no-ssh-add" ]; then
+        true # ssh-add has been suppressed, do nothing
+    elif [ -f "$HOME/.ssh/id_knockout" ]; then
+        try_ssh_add "$HOME/.ssh/id_knockout"
+    elif ! compgen -G "$HOME/.ssh/id_*.pub" >/dev/null; then
+        echo "You don't have any SSH keys I could find. To avoid having to enter your"
+        echo "password twice, I recommend creating an SSH key for use with Knockout."
+        echo
+        echo "For example:"
+        echo
+        echo "    ssh-keygen -t ed25519 -f ~/.ssh/id_knockout"
+        echo
+        echo "You will then have to add the public key (from ~/.ssh/id_knockout.pub) to"
+        echo "the ~/.ssh/authorized_keys file on your Knockout server."
+        echo
+    else
+        echo "You don't have a Knockout-specific SSH key, so I'm trying all the SSH keys I"
+        echo "can find."
+        echo
+        echo "To avoid this message in the future, and potentially some unwanted password"
+        echo "prompts, make a Knockout-specific private key, either by generating it with:"
+        echo
+        echo "    ssh-keygen -t ed25519 -f ~/.ssh/id_knockout"
+        echo
+        echo "or by copying an existing key into place. Either way, make sure that the"
+        echo "corresponding public key is in the ~/.ssh/authorized_keys file on your"
+        echo "Knockout server."
+        echo
+        for PUBKEY in "$HOME/.ssh/id_"*".pub"; do
+            KEY="$(echo "$PUBKEY" | sed -Ee 's/\.pub$//')"
+            try_ssh_add "$KEY"
+        done
+    fi
+fi
+
 if [ -r "$KNOCKOUT_DIR"/extras ]; then
-    EXTRAS=$(cat "$KNOCKOUT_DIR"/extras)
+    EXTRAS="$(cat "$KNOCKOUT_DIR"/extras)"
 else
     EXTRAS=
 fi
@@ -75,8 +115,7 @@ else
     PROGRESS_OPTIONS=""
 fi
 
-HOST=$(cat "$KNOCKOUT_DIR"/host)
-DIR=$(cat "$KNOCKOUT_DIR"/dir)
+DIR="$(cat "$KNOCKOUT_DIR"/dir)"
 TARGET=
 if [ "$HOST" = localhost ]; then
     TARGET="$DIR"/current
@@ -88,7 +127,7 @@ else
     TARGET="$HOST":"$DIR"/current
     if [ -z "$RSYNC_RSH" ]; then
         if [ -r "$KNOCKOUT_DIR"/rsh ]; then
-            RSYNC_RSH=$(cat "$KNOCKOUT_DIR"/rsh)
+            RSYNC_RSH="$(cat "$KNOCKOUT_DIR"/rsh)"
         else
             RSYNC_RSH=ssh
         fi
