@@ -111,8 +111,10 @@ fi
 
 if [ -t 1 -a "$#" -le 0 ]; then
     PROGRESS_OPTIONS="--human-readable --progress --stats"
+    WE_ARE_LOUD=yes
 else
     PROGRESS_OPTIONS=""
+    WE_ARE_LOUD=no
 fi
 
 DIR="$(cat "$KNOCKOUT_DIR"/dir)"
@@ -140,7 +142,7 @@ if [ -z "$NO_FAKE_SUPER" ]; then
     EXTRAS="-M--fake-super --numeric-ids $EXTRAS"
 fi
 
-rsync \
+if rsync \
     --rsync-path "nice -n 20 rsync" \
     $PROGRESS_OPTIONS \
     --acls \
@@ -158,8 +160,49 @@ rsync \
     $EXTRAS \
     "$@" \
     / \
-    "$TARGET" \
-    || exit 2
-
-# $RUN_COMMAND_ON_HOST should not be quoted, as it may contain arguments
-$RUN_COMMAND_ON_HOST knockout-snap "$DIR" || exit 5
+    "$TARGET"
+then
+    # $RUN_COMMAND_ON_HOST should not be quoted, as it may contain arguments
+    $RUN_COMMAND_ON_HOST knockout-snap "$DIR" || exit 5
+    if [ -t 1 ]; then
+        echo
+        case "$TERM" in
+            screen* | xterm* | tmux* | vt1* | ansi*)
+                # Any of these terminals should be able to cope with these
+                # ANSI codes. Even if they're not color-capable, they'll
+                # hopefully ignore the color code and respect only the bold
+                # code... or, at the very worst, just eat the whole escape
+                # sequence.
+                printf "\e[32;1mBackup completed successfully.\e[0m\n"
+                ;;
+            *)
+                echo "Backup completed successfully."
+                ;;
+        esac
+        echo
+    fi
+else
+    echo
+    if [ ! -t 1 ]; then
+        TERM=nope
+    fi
+    case "$TERM" in
+        screen* | xterm* | tmux* | vt1* | ansi*)
+            printf "\e[31;1mBackup was NOT completed successfully!\e[0m\n"
+            ;;
+        *)
+            echo "Backup was NOT completed successfully!"
+            ;;
+    esac
+    echo
+    echo "Please resolve any error messages above and run the backup again."
+    if [ "$WE_ARE_LOUD" = "yes" ]; then
+        echo
+        echo "To print less information, making it easier to see what went wrong, pass a"
+        echo "single -- as an argument, like:"
+        echo
+        echo "    $0 --"
+    fi
+    echo
+    exit 2
+fi
