@@ -65,7 +65,14 @@ if [ "$HOST" != localhost -a ! -f "$KNOCKOUT_DIR/no-ssh-agent" ] && \
         KEY="$1"
         FINGERPRINT="$(ssh-keygen -l -f "$KEY" | awk '{print $2}')"
         if ! ssh-add -l | grep -qFe "$FINGERPRINT"; then
-            ssh-add "$KEY"
+            if [ -t 2 ]; then
+                # stderr is a tty, the user may care which key(s) got used
+                ssh-add "$KEY"
+            else
+                # stderr is not a tty, we're probably a cron job, don't be
+                # verbose
+                ssh-add -q "$KEY"
+            fi
         fi
     }
     if [ -f "$KNOCKOUT_DIR/no-ssh-add" ]; then
